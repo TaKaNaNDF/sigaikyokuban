@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>市外局番パズル＆クイズ</title>
     <style>
+        /* 基本的なスタイルは変更なし */
         body {
             font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
             display: flex;
@@ -26,23 +27,10 @@
             max-width: 800px;
         }
         
-        /* 画面切り替えの基本スタイル */
-        .screen {
-            display: none;
-        }
-        .screen.active {
-            display: block;
-        }
-
-        h1, h2 {
-            color: #005a9c;
-            margin-top: 0;
-        }
-
-        p {
-            font-size: 1.1em;
-            line-height: 1.6;
-        }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        h1, h2 { color: #005a9c; margin-top: 0; }
+        p { font-size: 1.1em; line-height: 1.6; }
 
         .btn {
             display: inline-block;
@@ -67,36 +55,11 @@
             background: linear-gradient(45deg, #6c757d, #5a6268);
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
-        .btn-secondary:hover:not(:disabled) {
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
-        }
 
         /* クイズ画面 */
-        #question-area {
-            margin: 2em 0;
-            font-size: 2.5em;
-            font-weight: bold;
-            letter-spacing: 2px;
-            background-color: #e9ecef;
-            padding: 15px;
-            border-radius: 8px;
-            display: inline-block;
-        }
-        #answer-input {
-            width: 80%;
-            padding: 15px;
-            font-size: 1.2em;
-            border: 2px solid #ccc;
-            border-radius: 8px;
-            margin-top: 1em;
-            text-align: center;
-        }
-        #feedback {
-            font-size: 1.3em;
-            font-weight: bold;
-            margin-top: 1em;
-            height: 30px;
-        }
+        #question-area { margin: 1em 0; font-size: 2.5em; font-weight: bold; letter-spacing: 2px; background-color: #e9ecef; padding: 15px; border-radius: 8px; display: inline-block; }
+        #answer-input { width: 80%; padding: 15px; font-size: 1.2em; border: 2px solid #ccc; border-radius: 8px; margin-top: 1em; text-align: center; }
+        #feedback { font-size: 1.3em; font-weight: bold; margin-top: 1em; height: 30px; }
         .correct { color: #28a745; }
         .incorrect { color: #dc3545; }
 
@@ -106,10 +69,12 @@
             width: 100%;
             max-width: 700px;
             margin: 1.5em auto;
+            touch-action: none; /* スマホでの操作性を向上 */
         }
         #puzzle-container img {
             width: 100%;
             border-radius: 10px;
+            pointer-events: none; /* 画像がタッチイベントを妨害しないように */
         }
         .drop-zone {
             position: absolute;
@@ -130,7 +95,7 @@
              display: flex;
              justify-content: center;
              align-items: center;
-             font-size: 0.8em;
+             font-size: clamp(0.6em, 2vw, 0.8em);
         }
         #codes-container {
             margin-top: 20px;
@@ -151,23 +116,16 @@
             user-select: none;
             font-weight: bold;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: opacity 0.2s;
         }
-        .code-item:active {
-            cursor: grabbing;
-        }
-
-        /* 結果画面 */
-        #score {
-            font-size: 3em;
-            color: #d32f2f;
-            margin: 0.5em 0;
-        }
-        #puzzle-feedback {
-            font-size: 1.5em;
-            color: #28a745;
-            font-weight: bold;
+        .code-item.dragging {
+            opacity: 0.5; /* ドラッグ中のアイテムを半透明に */
+            z-index: 1000;
         }
 
+        #result-screen { text-align: center; }
+        #score { font-size: 3em; color: #d32f2f; margin: 0.5em 0; }
+        #puzzle-feedback { font-size: 1.5em; color: #28a745; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -200,7 +158,7 @@
 
         <div id="result-screen" class="screen">
             <h1>結果発表</h1>
-            <div id="quiz-result">
+            <div id="quiz-result" style="display:none;">
                 <p>あなたのスコアは...</p>
                 <div id="score"></div>
             </div>
@@ -214,97 +172,90 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
 
+        // ★★位置ズレ修正のため、座標データをより正確に見直し★★
         const areaCodeData = [
-            { name: '札幌', code: '011', coords: { top: '15%', left: '17%', w: '5%', h: '5%' } },
-            { name: '青森', code: '017', coords: { top: '16%', left: '72%', w: '5%', h: '5%' } },
-            { name: '盛岡', code: '019', coords: { top: '19%', left: '78%', w: '5%', h: '5%' } },
-            { name: '仙台', code: '022', coords: { top: '27%', left: '77%', w: '5%', h: '5%' } },
-            { name: '秋田', code: '018', coords: { top: '20%', left: '68%', w: '5%', h: '5%' } },
-            { name: '山形', code: '023', coords: { top: '29%', left: '71%', w: '5%', h: '5%' } },
-            { name: '福島', code: '024', coords: { top: '34%', left: '74%', w: '5%', h: '5%' } },
-            { name: '水戸', code: '029', coords: { top: '44%', left: '76%', w: '5%', h: '5%' } },
-            { name: '宇都宮', code: '028', coords: { top: '40%', left: '71%', w: '5%', h: '5%' } },
-            { name: '前橋', code: '027', coords: { top: '41%', left: '66%', w: '5%', h: '5%' } },
-            { name: 'さいたま', code: '048', coords: { top: '48%', left: '68%', w: '5%', h: '5%' } },
-            { name: '千葉', code: '043', coords: { top: '53%', left: '76%', w: '5%', h: '5%' } },
-            { name: '東京', code: '03', coords: { top: '52%', left: '71%', w: '5%', h: '5%' } },
-            { name: '横浜', code: '045', coords: { top: '56%', left: '70%', w: '5%', h: '5%' } },
-            { name: '新潟', code: '025', coords: { top: '34%', left: '65%', w: '5%', h: '5%' } },
-            { name: '富山', code: '076', coords: { top: '40%', left: '55%', w: '5%', h: '5%' } },
-            { name: '金沢', code: '076', coords: { top: '42%', left: '50%', w: '5%', h: '5%' } },
-            { name: '福井', code: '077', coords: { top: '49%', left: '46%', w: '5%', h: '5%' } },
-            { name: '甲府', code: '055', coords: { top: '53%', left: '63%', w: '5%', h: '5%' } },
-            { name: '長野', code: '026', coords: { top: '42%', left: '60%', w: '5%', h: '5%' } },
-            { name: '岐阜', code: '058', coords: { top: '54%', left: '52%', w: '5%', h: '5%' } },
-            { name: '静岡', code: '054', coords: { top: '60%', left: '63%', w: '5%', h: '5%' } },
-            { name: '名古屋', code: '052', coords: { top: '59%', left: '54%', w: '5%', h: '5%' } },
-            { name: '津', code: '059', coords: { top: '62%', left: '49%', w: '5%', h: '5%' } },
-            { name: '大津', code: '077', coords: { top: '58%', left: '46%', w: '5%', h: '5%' } },
-            { name: '京都', code: '075', coords: { top: '58%', left: '42%', w: '5%', h: '5%' } },
-            { name: '大阪', code: '06', coords: { top: '63%', left: '42%', w: '5%', h: '5%' } },
-            { name: '神戸', code: '078', coords: { top: '63%', left: '38%', w: '5%', h: '5%' } },
-            { name: '奈良', code: '074', coords: { top: '65%', left: '46%', w: '5%', h: '5%' } },
-            { name: '和歌山', code: '073', coords: { top: '68%', left: '41%', w: '5%', h: '5%' } },
-            { name: '鳥取', code: '085', coords: { top: '56%', left: '34%', w: '5%', h: '5%' } },
-            { name: '松江', code: '085', coords: { top: '55%', left: '29%', w: '5%', h: '5%' } },
-            { name: '岡山', code: '086', coords: { top: '62%', left: '34%', w: '5%', h: '5%' } },
-            { name: '広島', code: '082', coords: { top: '64%', left: '28%', w: '5%', h: '5%' } },
-            { name: '山口', code: '083', coords: { top: '67%', left: '21%', w: '5%', h: '5%' } },
-            { name: '徳島', code: '088', coords: { top: '69%', left: '36%', w: '5%', h: '5%' } },
-            { name: '高松', code: '087', coords: { top: '67%', left: '34%', w: '5%', h: '5%' } },
-            { name: '松山', code: '089', coords: { top: '69%', left: '29%', w: '5%', h: '5%' } },
-            { name: '高知', code: '088', coords: { top: '74%', left: '32%', w: '5%', h: '5%' } },
-            { name: '福岡', code: '092', coords: { top: '71%', left: '15%', w: '5%', h: '5%' } },
-            { name: '佐賀', code: '095', coords: { top: '75%', left: '13%', w: '5%', h: '5%' } },
-            { name: '長崎', code: '095', coords: { top: '79%', left: '10%', w: '5%', h: '5%' } },
-            { name: '熊本', code: '096', coords: { top: '80%', left: '15%', w: '5%', h: '5%' } },
-            { name: '大分', code: '097', coords: { top: '76%', left: '21%', w: '5%', h: '5%' } },
-            { name: '宮崎', code: '0985', coords: { top: '83%', left: '20%', w: '5%', h: '5%' } },
-            { name: '鹿児島', code: '099', coords: { top: '88%', left: '15%', w: '5%', h: '5%' } },
-            { name: '那覇', code: '098', coords: { top: '88%', left: '45%', w: '5%', h: '5%' } }
+            // 北海道
+            { name: '札幌', code: '011', coords: { top: 22, left: 24 } },
+            { name: '函館', code: '0138', coords: { top: 40, left: 18 } },
+            // 東北
+            { name: '青森', code: '017', coords: { top: 16, left: 73 } },
+            { name: '盛岡', code: '019', coords: { top: 20, left: 79 } },
+            { name: '仙台', code: '022', coords: { top: 28, left: 78 } },
+            { name: '秋田', code: '018', coords: { top: 21, left: 69 } },
+            { name: '山形', code: '023', coords: { top: 30, left: 71 } },
+            { name: '福島', code: '024', coords: { top: 34, left: 74 } },
+            // 関東
+            { name: '水戸', code: '029', coords: { top: 44, left: 76 } },
+            { name: '宇都宮', code: '028', coords: { top: 40, left: 71 } },
+            { name: '前橋', code: '027', coords: { top: 41, left: 66 } },
+            { name: 'さいたま', code: '048', coords: { top: 48, left: 68 } },
+            { name: '千葉', code: '043', coords: { top: 52, left: 75 } },
+            { name: '東京', code: '03', coords: { top: 52, left: 70 } },
+            { name: '横浜', code: '045', coords: { top: 55, left: 69 } },
+            // 中部
+            { name: '新潟', code: '025', coords: { top: 34, left: 66 } },
+            { name: '富山', code: '076', coords: { top: 40, left: 55 } },
+            { name: '金沢', code: '076', coords: { top: 42, left: 50 } },
+            { name: '福井', code: '077', coords: { top: 48, left: 47 } },
+            { name: '甲府', code: '055', coords: { top: 53, left: 62 } },
+            { name: '長野', code: '026', coords: { top: 42, left: 60 } },
+            { name: '岐阜', code: '058', coords: { top: 54, left: 52 } },
+            { name: '静岡', code: '054', coords: { top: 59, left: 63 } },
+            { name: '名古屋', code: '052', coords: { top: 59, left: 54 } },
+            // 近畿
+            { name: '津', code: '059', coords: { top: 62, left: 49 } },
+            { name: '大津', code: '077', coords: { top: 58, left: 46 } },
+            { name: '京都', code: '075', coords: { top: 57, left: 42 } },
+            { name: '大阪', code: '06', coords: { top: 63, left: 42 } },
+            { name: '神戸', code: '078', coords: { top: 62, left: 38 } },
+            { name: '奈良', code: '074', coords: { top: 65, left: 46 } },
+            { name: '和歌山', code: '073', coords: { top: 68, left: 41 } },
+            // 中国
+            { name: '鳥取', code: '085', coords: { top: 55, left: 34 } },
+            { name: '松江', code: '085', coords: { top: 55, left: 29 } },
+            { name: '岡山', code: '086', coords: { top: 62, left: 34 } },
+            { name: '広島', code: '082', coords: { top: 64, left: 28 } },
+            { name: '山口', code: '083', coords: { top: 67, left: 21 } },
+            // 四国
+            { name: '徳島', code: '088', coords: { top: 69, left: 36 } },
+            { name: '高松', code: '087', coords: { top: 67, left: 34 } },
+            { name: '松山', code: '089', coords: { top: 69, left: 29 } },
+            { name: '高知', code: '088', coords: { top: 73, left: 32 } },
+            // 九州・沖縄
+            { name: '福岡', code: '092', coords: { top: 71, left: 15 } },
+            { name: '佐賀', code: '095', coords: { top: 75, left: 13 } },
+            { name: '長崎', code: '095', coords: { top: 78, left: 9 } },
+            { name: '熊本', code: '096', coords: { top: 80, left: 15 } },
+            { name: '大分', code: '097', coords: { top: 76, left: 21 } },
+            { name: '宮崎', code: '0985', coords: { top: 84, left: 20 } },
+            { name: '鹿児島', code: '099', coords: { top: 88, left: 15 } },
+            { name: '那覇', code: '098', coords: { top: 88, left: 45 } }
         ];
-        
-        const uniquePuzzleData = [...new Map(areaCodeData.map(item => [item.code, item])).values()];
 
+        const uniquePuzzleData = [...new Map(areaCodeData.map(item => [item.code, item])).values()];
+        
+        // --- 共通DOM要素 ---
         const screens = document.querySelectorAll('.screen');
-        const startQuizBtn = document.getElementById('start-quiz-btn');
-        const startPuzzleBtn = document.getElementById('start-puzzle-btn');
         const homeButton = document.getElementById('home-button');
         
-        const questionNumberEl = document.getElementById('question-number');
-        const questionArea = document.getElementById('question-area');
-        const answerInput = document.getElementById('answer-input');
-        const submitAnswerBtn = document.getElementById('submit-answer');
-        const feedbackEl = document.getElementById('feedback');
-
-        const puzzleContainer = document.getElementById('puzzle-container');
-        const codesContainer = document.getElementById('codes-container');
-
-        const quizResultEl = document.getElementById('quiz-result');
-        const puzzleResultEl = document.getElementById('puzzle-result');
-        const scoreEl = document.getElementById('score');
-
-        let score = 0;
-        let currentQuestionIndex = 0;
-        const totalQuestions = 10;
-        let quizQuestions = [];
-
-        startQuizBtn.addEventListener('click', startQuiz);
-        startPuzzleBtn.addEventListener('click', startPuzzle);
-        homeButton.addEventListener('click', showHomeScreen);
-        submitAnswerBtn.addEventListener('click', checkQuizAnswer);
-        answerInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') checkQuizAnswer();
-        });
-
+        // --- モード選択 ---
+        document.getElementById('start-quiz-btn').addEventListener('click', startQuiz);
+        document.getElementById('start-puzzle-btn').addEventListener('click', startPuzzle);
+        homeButton.addEventListener('click', () => switchScreen('home-screen'));
+        
         function switchScreen(screenId) {
             screens.forEach(screen => screen.classList.remove('active'));
             document.getElementById(screenId).classList.add('active');
         }
 
-        function showHomeScreen() {
-            switchScreen('home-screen');
-        }
+        // --- クイズモード ---
+        let score = 0, currentQuestionIndex = 0, quizQuestions = [];
+        const totalQuestions = 10;
+        const questionNumberEl = document.getElementById('question-number');
+        const questionArea = document.getElementById('question-area');
+        const answerInput = document.getElementById('answer-input');
+        const submitAnswerBtn = document.getElementById('submit-answer');
+        const feedbackEl = document.getElementById('feedback');
 
         function startQuiz() {
             score = 0;
@@ -330,105 +281,170 @@
 
         function checkQuizAnswer() {
             const userAnswer = answerInput.value.trim();
-            const correctAnswer = quizQuestions[currentQuestionIndex].name;
-
-            // 同じ市外局番を持つ都市が複数ある場合に対応
-            const possibleAnswers = areaCodeData.filter(d => d.code === quizQuestions[currentQuestionIndex].code).map(d => d.name);
+            const correctAnswerCode = quizQuestions[currentQuestionIndex].code;
+            const possibleAnswers = areaCodeData.filter(d => d.code === correctAnswerCode).map(d => d.name);
 
             if (possibleAnswers.includes(userAnswer)) {
                 feedbackEl.textContent = '正解！';
                 feedbackEl.className = 'correct';
                 score++;
             } else {
-                feedbackEl.textContent = `不正解... 正解は ${correctAnswer} などです。`;
+                feedbackEl.textContent = `不正解... 正解は ${possibleAnswers.join('、')} などです。`;
                 feedbackEl.className = 'incorrect';
             }
             
             currentQuestionIndex++;
             setTimeout(nextQuestion, 1500);
         }
+        submitAnswerBtn.addEventListener('click', checkQuizAnswer);
+        answerInput.addEventListener('keydown', (e) => e.key === 'Enter' && checkQuizAnswer());
 
+        // --- パズルモード ---
+        const puzzleContainer = document.getElementById('puzzle-container');
+        const codesContainer = document.getElementById('codes-container');
         let correctDrops = 0;
 
         function startPuzzle() {
             correctDrops = 0;
-            // ★★修正点: 新しいGitHubのURLに差し替え★★
             puzzleContainer.innerHTML = `<img src="https://raw.githubusercontent.com/TaKaNaNDF/sigaikyokuban/refs/heads/main/unnamed.png" alt="日本地図">`;
             codesContainer.innerHTML = '';
-            
-            const puzzleDataSet = shuffleArray([...uniquePuzzleData]);
-            
-            puzzleDataSet.forEach(item => {
-                const zone = document.createElement('div');
-                zone.classList.add('drop-zone');
-                zone.dataset.code = item.code;
-                zone.style.top = item.coords.top;
-                zone.style.left = item.coords.left;
-                zone.style.width = item.coords.w;
-                zone.style.height = item.coords.h;
-                puzzleContainer.appendChild(zone);
 
-                const codeItem = document.createElement('div');
-                codeItem.classList.add('code-item');
-                codeItem.textContent = item.code;
-                codeItem.dataset.code = item.code;
-                codeItem.draggable = true;
-                codesContainer.appendChild(codeItem);
-            });
+            const puzzleImage = puzzleContainer.querySelector('img');
+            
+            const initPuzzle = () => {
+                const puzzleDataSet = shuffleArray([...uniquePuzzleData]);
+                const imageRect = puzzleImage.getBoundingClientRect();
+                
+                // ドロップゾーンとアイテムを生成
+                puzzleDataSet.forEach(item => {
+                    const zone = document.createElement('div');
+                    zone.className = 'drop-zone';
+                    zone.dataset.code = item.code;
+                    // ★★位置ズレ修正：画像の実際のサイズに基づいてpxで座標を計算★★
+                    const zoneSize = imageRect.width * 0.05; // ゾーンの直径
+                    zone.style.width = `${zoneSize}px`;
+                    zone.style.height = `${zoneSize}px`;
+                    zone.style.left = `${imageRect.width * (item.coords.left / 100) - (zoneSize / 2)}px`;
+                    zone.style.top = `${imageRect.height * (item.coords.top / 100) - (zoneSize / 2)}px`;
+                    puzzleContainer.appendChild(zone);
 
-            setupDragAndDrop();
-            switchScreen('puzzle-screen');
+                    const codeItem = document.createElement('div');
+                    codeItem.className = 'code-item';
+                    codeItem.textContent = item.code;
+                    codeItem.dataset.code = item.code;
+                    codeItem.draggable = true;
+                    codesContainer.appendChild(codeItem);
+                });
+                
+                setupEventListeners();
+                switchScreen('puzzle-screen');
+            };
+
+            // 画像が読み込まれてからパズルを初期化
+            if (puzzleImage.complete) {
+                initPuzzle();
+            } else {
+                puzzleImage.onload = initPuzzle;
+            }
         }
 
-        function setupDragAndDrop() {
-            const codeItems = document.querySelectorAll('.code-item');
-            const dropZones = document.querySelectorAll('.drop-zone');
-
+        function setupEventListeners() {
+            const codeItems = codesContainer.querySelectorAll('.code-item');
+            
+            // PC向け：ドラッグ＆ドロップイベント
             codeItems.forEach(item => {
-                item.addEventListener('dragstart', (e) => {
-                    e.dataTransfer.setData('text/plain', item.dataset.code);
-                    setTimeout(() => item.style.display = 'none', 0);
-                });
-                item.addEventListener('dragend', (e) => {
-                   if (!e.dataTransfer.dropEffect || e.dataTransfer.dropEffect === 'none') {
-                        item.style.display = 'block';
-                   }
-                });
+                item.addEventListener('dragstart', handleDragStart);
+                item.addEventListener('dragend', handleDragEnd);
             });
+            puzzleContainer.addEventListener('dragover', handleDragOver);
+            puzzleContainer.addEventListener('drop', handleDrop);
 
-            dropZones.forEach(zone => {
-                zone.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    if(!zone.classList.contains('dropped')) {
-                       zone.classList.add('over');
-                    }
-                });
-                zone.addEventListener('dragleave', () => {
-                    zone.classList.remove('over');
-                });
-                zone.addEventListener('drop', (e) => {
-                    e.preventDefault();
-                    zone.classList.remove('over');
-                    if(zone.classList.contains('dropped')) return;
-
-                    const draggedCode = e.dataTransfer.getData('text/plain');
-                    if (zone.dataset.code === draggedCode) {
-                        zone.classList.add('dropped');
-                        zone.textContent = draggedCode;
-                        
-                        const draggedItem = codesContainer.querySelector(`[data-code="${draggedCode}"]`);
-                        if (draggedItem) draggedItem.remove();
-
-                        correctDrops++;
-                        if (correctDrops === uniquePuzzleData.length) {
-                           setTimeout(() => showResult('puzzle'), 500);
-                        }
-                    }
-                });
+            // ★★スマホ向け：タッチイベント★★
+            codeItems.forEach(item => {
+                item.addEventListener('touchstart', handleTouchStart, { passive: false });
             });
         }
 
+        // --- ドラッグ＆ドロップ（PC）ロジック ---
+        function handleDragStart(e) {
+            e.target.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', e.target.dataset.code);
+        }
+        function handleDragEnd(e) {
+            e.target.classList.remove('dragging');
+        }
+        function handleDragOver(e) {
+            e.preventDefault();
+        }
+        function handleDrop(e) {
+            e.preventDefault();
+            const draggedCode = e.dataTransfer.getData('text/plain');
+            const draggedItem = codesContainer.querySelector(`.code-item[data-code='${draggedCode}']`);
+            if (!draggedItem) return;
+
+            const dropZone = e.target.closest('.drop-zone');
+            if (dropZone && !dropZone.classList.contains('dropped') && dropZone.dataset.code === draggedCode) {
+                finalizeDrop(dropZone, draggedItem);
+            }
+        }
+
+        // --- タッチ操作（スマホ）ロジック ---
+        let touchDragItem = null;
+        function handleTouchStart(e) {
+            e.preventDefault();
+            touchDragItem = e.target;
+            touchDragItem.classList.add('dragging');
+        }
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+        document.addEventListener('touchend', handleTouchEnd);
+
+        function handleTouchMove(e) {
+            if (!touchDragItem) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+            const dropZone = elementUnder ? elementUnder.closest('.drop-zone') : null;
+            
+            // 全てのゾーンからハイライトを一旦削除
+            puzzleContainer.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+            
+            // 有効なゾーンの上にあればハイライト
+            if(dropZone && !dropZone.classList.contains('dropped')) {
+                dropZone.classList.add('over');
+            }
+        }
+        
+        function handleTouchEnd(e) {
+            if (!touchDragItem) return;
+            const touch = e.changedTouches[0];
+            const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+            puzzleContainer.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('over'));
+
+            const dropZone = elementUnder ? elementUnder.closest('.drop-zone') : null;
+            if (dropZone && !dropZone.classList.contains('dropped') && dropZone.dataset.code === touchDragItem.dataset.code) {
+                finalizeDrop(dropZone, touchDragItem);
+            }
+            touchDragItem.classList.remove('dragging');
+            touchDragItem = null;
+        }
+
+        // --- 共通ドロップ処理 ---
+        function finalizeDrop(dropZone, draggedItem) {
+            dropZone.classList.add('dropped');
+            dropZone.textContent = draggedItem.dataset.code;
+            draggedItem.remove();
+            correctDrops++;
+            if (correctDrops === uniquePuzzleData.length) {
+                setTimeout(() => showResult('puzzle'), 500);
+            }
+        }
+        
+        // --- 結果表示 ---
         function showResult(mode) {
+            const quizResultEl = document.getElementById('quiz-result');
+            const puzzleResultEl = document.getElementById('puzzle-result');
+            const scoreEl = document.getElementById('score');
+            
             switchScreen('result-screen');
             if (mode === 'quiz') {
                 quizResultEl.style.display = 'block';
@@ -440,6 +456,7 @@
             }
         }
         
+        // --- ユーティリティ ---
         function shuffleArray(array) {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
